@@ -1,0 +1,69 @@
+# This file describes test cases for this project. Each block of
+# lines describes one test. The first line is the command to invoke
+# to run the test, and the following lines are the expected output.
+
+./test read
+Creating file with 3 pages
+Mapped file; region has 12288 bytes
+Reading memory-mapped pages
+Page 1 signature: __test__, page 1, checksum 0
+Page 0 signature: __test__, page 0, checksum 0
+Page 2 signature: __test__, page 2, checksum 0
+Paging I/O: 3 pages read, 0 pages written
+
+./test write
+Mapping new file
+Writing 3 memory-mapped pages
+Destroying MCryptFile
+Reading page signatures from file:
+write_test, page 0, checksum 0
+write_test, page 1, checksum 0
+write_test, page 2, checksum 0
+
+./test update
+Creating file with 2 pages
+Mapped file; region has 8192 bytes
+Updating page 1
+Page signatures in file before flush:
+__test__, page 0, checksum 0
+__test__, page 1, checksum 0
+Page signatures in file after flush:
+__test__, page 0, checksum 0
+__1234__, page 1, checksum -860045376
+Paging I/O: 1 pages read, 1 pages written
+
+./test extend
+Creating file with 2 pages
+Mapping with region size 409600
+Writing pages 2 and 3
+Syncing
+Page signatures in file after flush:
+__test__, page 0, checksum 0
+__test__, page 1, checksum 0
+new_info, page 2, checksum 0
+new_info, page 3, checksum 0
+Paging I/O: 0 pages read, 2 pages written
+
+./test multiple_writes
+Creating file with 2 pages
+Updating page 0
+Syncing
+Updating page 0 again
+Syncing again
+Page signatures in file after flush:
+__2222__, page 0, checksum -859980353
+__test__, page 1, checksum 0
+Paging I/O: 1 pages read, 2 pages written
+
+./test remap
+Creating file with 2 pages
+Mapping with default region size
+Updating page 0
+Unmapping (without flush), then remapping with region size 12288
+Writing (new) page 2
+Syncing
+Page signatures in file after flush:
+__1111__, page 0, checksum -876823362
+__test__, page 1, checksum 0
+new_info, page 2, checksum 0
+Paging I/O: 1 pages read, 2 pages written
