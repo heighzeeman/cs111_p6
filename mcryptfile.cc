@@ -49,8 +49,8 @@ void MCryptFile::VMhandler(char *va) {
 		pvreg->pt.insert(pte);
 		std::size_t offset = static_cast<std::size_t>(std::uintptr_t(vp - pvreg->get_base()));
 		aligned_pread(vp, get_page_size(), offset);
+		pte->clear_accessed();
 	}
-	pte->clear_accessed();
 	Prot prot = PROT_READ;
 	if (pte->accessed || pte->dirty) prot |= PROT_WRITE;
 	pte->protect(prot);
