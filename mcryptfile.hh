@@ -28,10 +28,9 @@ struct PagedVRegion {
 	itree<&PTE::vp, &PTE::link> pt;
 
     PagedVRegion(std::size_t nbytes, std::function<void(char *)> hdlr)
-     : vmem(nbytes, [hdlr](char *a){ hdlr(a); }), pt(), handler(hdlr) {}
+     : vmem(nbytes, hdlr), pt() {}
     ~PagedVRegion();
 
-    std::function<void(char *)> handler;
 	char *get_base() { return vmem.get_base(); }
 	std::size_t size() { return vmem.nbytes_; }
 
@@ -92,7 +91,6 @@ struct MCryptFile : public CryptFile {
 private:
 	static PhysMem *pm;	  // Pointer to a PhysMem object created statically on the first use of map
 	static std::size_t phys_npages;
-	static bool not_allocated;
 	
     PagedVRegion *pvreg;
 	void VMhandler(char *va);

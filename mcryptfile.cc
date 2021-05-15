@@ -1,15 +1,8 @@
-#include <cassert>
-#include <cstring>
-#include <iostream>
-
-#include <sys/stat.h>
-
 #include "mcryptfile.hh"
 #include "vm.hh"
 
 // Initialize some static MCryptFile variables
 std::size_t MCryptFile::phys_npages = 1000;
-bool MCryptFile::not_allocated = true;
 // Doesn't allocate, simply initializes MCryptFile::pm so PagedVRegion can access it
 PhysMem *MCryptFile::pm = nullptr;
 
@@ -79,13 +72,12 @@ MCryptFile::~MCryptFile()
 char *
 MCryptFile::map(size_t min_size)
 {	
-	// Allocates PhysMem on first use of map
-	if (not_allocated) {
+	// Allocates PhysMem on first use of map. If statement not necessary but for ideological flow.
+	if (!pm) {
 		static PhysMem p(phys_npages);
 		pm = &p;
-		not_allocated = false;
 	}
-	while (pvreg != nullptr) unmap();	// Same thing as an if here
+	while (pvreg != nullptr) unmap();	// Same thing as an if here. If currently mapped, unmap.
     pvreg = new PagedVRegion(std::max(min_size, file_size()), [this](char *a){ VMhandler(a); });
     return pvreg->get_base();
 }
