@@ -3,21 +3,12 @@
 
 // Initialize some static MCryptFile variables
 std::size_t MCryptFile::phys_npages = 1000;
-int MCryptFile::instances = 0;
 ilist<&PagedVRegion::PTE::list_link> MCryptFile::currentPTEs;
 // Doesn't allocate, simply initializes MCryptFile::pm so PagedVRegion can access it
 PhysMem *MCryptFile::pm = nullptr;
 
-PagedVRegion::PTE::PTE(VPage vp0, Prot p)
-  : vp(vp0), pp(MCryptFile::pm->page_alloc())
-{
-    if (!pp) throw std::runtime_error("Not enough PhysMem pages.");
-    protect(p);
-}
-
-
-PagedVRegion::PTE::PTE(VPage vp0, Prot p, PPage pp)
-  : vp(vp0), pp(pp)
+PagedVRegion::PTE::PTE(VPage vp0, Prot p, VPage vr)
+  : vp(vp0), pp(MCryptFile::pm->page_alloc()), vr(vr)
 {
     if (!pp) throw std::runtime_error("Not enough PhysMem pages.");
     protect(p);
@@ -56,34 +47,34 @@ void MCryptFile::VMhandler(char *va) {
 	VPage vp = va - std::uintptr_t(va) % get_page_size();
 	PagedVRegion::PTE *pte = pvreg->pt[vp];
 	if (!pte) {
-		PPage pp = pm->page_alloc();
-		if (!pp) {
-			static PagedVRegion::PTE *curr = MCryptFile::currentPTEs.front();
+		if (!pm->nfree()) {
+			static PagedVRegion::PTE *curr = currentPTEs.front();
 			while (true) {
-				curr = curr ? curr : MCryptFile::currentPTEs.front();
+				curr = curr ? curr : currentPTEs.front();
 				if (!curr) throw std::runtime_error("No page table entries.");
 				if (!curr->accessed) {
 					if (curr->dirty) {
-						VPage vp = curr->vp;
-						std::size_t offset = static_cast<std::size_t>(std::uintptr_t(vp - pvreg->get_base()));
-						MCryptFile::aligned_pwrite(vp, get_page_size(), offset);
+						curr->protect(PROT_READ | PROT_WRITE);
+						VPage oldvp = curr->vp;
+						std::size_t offset = static_cast<std::size_t>(std::uintptr_t(oldvp - curr->vr));
+					
+						MCryptFile::aligned_pwrite(oldvp, get_page_size(), offset);
 					}
 					PagedVRegion::PTE *to_delete = curr;
 					curr = currentPTEs.next(curr);
 					delete to_delete;
 					break;
 				} else {
-					curr->accessed = false;
+					curr->clear_accessed();
 					curr = currentPTEs.next(curr);
 				}
 			}
-
-			pte = new PagedVRegion::PTE(vp, PROT_READ | PROT_WRITE);
-		} else pte = new PagedVRegion::PTE(vp, PROT_READ | PROT_WRITE, pp);
+		}
+		pte = new PagedVRegion::PTE(vp, PROT_READ | PROT_WRITE, pvreg->get_base());
 		
 		currentPTEs.push_back(pte);
 		pvreg->pt.insert(pte);
-		std::size_t offset = static_cast<std::size_t>(std::uintptr_t(vp - pvreg->get_base()));
+		std::size_t offset = static_cast<std::size_t>(std::uintptr_t(vp - pte->vr));
 		aligned_pread(vp, get_page_size(), offset);
 		pte->clear_accessed();
 		pte->dirty = false;
@@ -103,7 +94,6 @@ MCryptFile::MCryptFile(Key key, std::string path)
 MCryptFile::~MCryptFile()
 {
     unmap();
-	if (!instances) pm = nullptr;
 }
 
 
@@ -114,10 +104,10 @@ MCryptFile::map(size_t min_size)
 	if (!pm) {
 		static PhysMem p(phys_npages);
 		pm = &p;
-		++instances;
 	}
 	while (pvreg != nullptr) unmap();	// Same thing as an if here. If currently mapped, unmap.
     pvreg = new PagedVRegion(std::max(min_size, file_size()), [this](char *a){ VMhandler(a); });
+	if (!pvreg) throw std::runtime_error("Unable to create VMRegion.");
     return pvreg->get_base();
 }
 
@@ -127,7 +117,6 @@ MCryptFile::unmap()
     flush();
 	delete pvreg;
 	pvreg = nullptr;
-	--instances;
 }
 
 
@@ -139,11 +128,11 @@ MCryptFile::flush()
     PagedVRegion::PTE *end = pt.upper_bound(pvreg->get_base() + pvreg->size());
     while (cpte != end) {
         if (cpte->dirty) {
+			cpte->protect(PROT_READ | PROT_WRITE);
 			VPage vp = cpte->vp;
-			std::size_t offset = static_cast<std::size_t>(std::uintptr_t(vp - pvreg->get_base()));
+			std::size_t offset = static_cast<std::size_t>(std::uintptr_t(vp - cpte->vr));
 			aligned_pwrite(vp, get_page_size(), offset);
 			cpte->dirty = false;
-			cpte->accessed = false;
 			cpte->protect(PROT_READ);
 		}
 		cpte = pt.next(cpte);

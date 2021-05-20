@@ -17,9 +17,9 @@ struct PagedVRegion {
 		bool dirty = false;
 		itree_entry tree_link;
 		ilist_entry list_link;
+		VPage vr;
 
-		PTE(VPage vp0, Prot p);
-		PTE(VPage vp0, Prot p, PPage pp);
+		PTE(VPage vp0, Prot p, VPage vr);
 		~PTE();
 		void protect(Prot p);
 		void clear_accessed() { accessed = false; protect(PROT_NONE); }
