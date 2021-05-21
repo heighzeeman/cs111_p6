@@ -10,22 +10,25 @@
 // Credit: David Mazieres
 struct PagedVRegion {
 	struct PTE {
-		const VPage vp;
-		const PPage pp;
+		VPage vp;
+		PPage pp;
 		Prot prot;
 		bool accessed = false;
 		bool dirty = false;
-		itree_entry link;
+		itree_entry tree_link;
+		ilist_entry list_link;
+		
+		// Starting address of 1st VPage in VMRegion vp belongs to. Used for offset calculations.
+		VPage vr;
 
-
-		PTE(VPage vp0, Prot p);
+		PTE(VPage vp0, Prot p, VPage vr);
 		~PTE();
 		void protect(Prot p);
 		void clear_accessed() { accessed = false; protect(PROT_NONE); }
 	};
 	
     VMRegion vmem;
-	itree<&PTE::vp, &PTE::link> pt;
+	itree<&PTE::vp, &PTE::tree_link> pt;
 
     PagedVRegion(std::size_t nbytes, std::function<void(char *)> hdlr)
      : vmem(nbytes, hdlr), pt() {}
@@ -91,6 +94,9 @@ struct MCryptFile : public CryptFile {
 private:
 	static PhysMem *pm;	  // Pointer to a PhysMem object created statically on the first use of map
 	static std::size_t phys_npages;
+	static int instances;
+	static ilist<&PagedVRegion::PTE::list_link> currentPTEs;	// Circularly linked list of pages for clock algorithm
+	static PagedVRegion::PTE *clock_curr;	// Current page the clock hand is pointing to
 	
     PagedVRegion *pvreg;
 	void VMhandler(char *va);
