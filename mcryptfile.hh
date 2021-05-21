@@ -17,6 +17,8 @@ struct PagedVRegion {
 		bool dirty = false;
 		itree_entry tree_link;
 		ilist_entry list_link;
+		
+		// Starting address of 1st VPage in VMRegion vp belongs to. Used for offset calculations.
 		VPage vr;
 
 		PTE(VPage vp0, Prot p, VPage vr);
@@ -93,7 +95,8 @@ private:
 	static PhysMem *pm;	  // Pointer to a PhysMem object created statically on the first use of map
 	static std::size_t phys_npages;
 	static int instances;
-	static ilist<&PagedVRegion::PTE::list_link> currentPTEs;
+	static ilist<&PagedVRegion::PTE::list_link> currentPTEs;	// Circularly linked list of pages for clock algorithm
+	static PagedVRegion::PTE *clock_curr;	// Current page the clock hand is pointing to
 	
     PagedVRegion *pvreg;
 	void VMhandler(char *va);
